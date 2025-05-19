@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Free Open World Car Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        WASD to drive | Arrow keys to look around<br>
+        Speed: <span id="speed">0</span> km/h
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js"></script>
+    <script>
+        // Basic setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(100, 100, 50);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+
+        // Ground
+        const groundGeometry = new THREE.PlaneGeometry(1000, 1000);
+        const groundTexture = new THREE.TextureLoader().load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg');
+        groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+        groundTexture.repeat.set(50, 50);
+        const groundMaterial = new THREE.MeshStandardMaterial({ map: groundTexture });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Simple road
+        const roadGeometry = new THREE.PlaneGeometry(20, 1000);
+        const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const road = new THREE.Mesh(roadGeometry, roadMaterial);
+        road.rotation.x = -Math.PI / 2;
+        road.position.z = -500;
+        road.receiveShadow = true;
+        scene.add(road);
+
+        // Add some simple obstacles
+        function addObstacle(x, z) {
+            const geometry = new THREE.BoxGeometry(5, 2, 5);
+            const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+            const obstacle = new THREE.Mesh(geometry, material);
+            obstacle.position.set(x, 1, z);
+            obstacle.castShadow = true;
+            obstacle.receiveShadow = true;
+            scene.add(obstacle);
+            return obstacle;
+        }
+
+        const obstacles = [];
+        for (let i = 0; i < 20; i++) {
+            const x = (Math.random() - 0.5) * 800;
+            const z = -Math.random() * 900;
+            if (Math.abs(x) > 15) { // Keep road clear
+                obstacles.push(addObstacle(x, z));
+            }
+        }
+
+        // Simple car (just a box for now)
+        const carGeometry = new THREE.BoxGeometry(4, 1.5, 8);
+        const carMaterial = new THREE.MeshStandardMaterial({ color: 0x00aaff });
+        const car = new THREE.Mesh(carGeometry, carMaterial);
+        car.position.y = 1.5;
+        car.castShadow = true;
+        scene.add(car);
+
+        // Camera follows car
+        camera.position.set(0, 5, 10);
+        camera.lookAt(car.position);
+
+        // Controls
+        const keys = {};
+        document.addEventListener('keydown', (e) => keys[e.key] = true);
+        document.addEventListener('keyup', (e) => keys[e.key] = false);
+
+        // Game state
+        let speed = 0;
+        let rotation = 0;
+        const maxSpeed = 0.5;
+        const acceleration = 0.01;
+        const deceleration = 0.02;
+        const rotationSpeed = 0.03;
+
+        // Game loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Car controls
+            if (keys['w'] || keys['ArrowUp']) {
+                speed = Math.min(speed + acceleration, maxSpeed);
+            } else if (keys['s'] || keys['ArrowDown']) {
+                speed = Math.max(speed - acceleration, -maxSpeed/2);
+            } else {
+                // Slow down when no key pressed
+                if (speed > 0) speed = Math.max(0, speed - deceleration);
+                else if (speed < 0) speed = Math.min(0, speed + deceleration);
+            }
+
+            if (keys['a'] || keys['ArrowLeft']) {
+                rotation += rotationSpeed;
+            }
+            if (keys['d'] || keys['ArrowRight']) {
+                rotation -= rotationSpeed;
+            }
+
+            // Move car
+            car.rotation.y = rotation;
+            car.position.x -= Math.sin(rotation) * speed;
+            car.position.z -= Math.cos(rotation) * speed;
+
+            // Camera follow
+            camera.position.x = car.position.x - Math.sin(rotation) * 10;
+            camera.position.z = car.position.z - Math.cos(rotation) * 10;
+            camera.position.y = car.position.y + 5;
+            camera.lookAt(car.position);
+
+            // Update speed display
+            document.getElementById('speed').textContent = Math.abs(Math.round(speed * 100));
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>
