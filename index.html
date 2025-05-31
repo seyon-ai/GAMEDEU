@@ -1,126 +1,564 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Simple Car Game</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobile Minecraft-like Game</title>
     <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
-        #info {
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none;
+            background-color: #87CEEB; /* Sky blue */
+            font-family: Arial, sans-serif;
+        }
+        
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100vh;
+        }
+        
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+        
+        .joystick {
+            width: 120px;
+            height: 120px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            position: relative;
+            margin: 0 20px;
+            pointer-events: auto;
+        }
+        
+        .joystick-inner {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
             position: absolute;
-            top: 10px;
-            left: 10px;
+            top: 30px;
+            left: 30px;
+        }
+        
+        #actionButtons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-right: 20px;
+            pointer-events: auto;
+        }
+        
+        .action-btn {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
             color: white;
-            font-family: Arial;
-            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        #inventory {
+            position: fixed;
+            bottom: 160px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
             padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            gap: 5px;
+            pointer-events: auto;
+        }
+        
+        .inventory-slot {
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .block-icon {
+            width: 30px;
+            height: 30px;
+            background-size: cover;
         }
     </style>
 </head>
 <body>
-    <div id="info">
-        WASD to drive | Arrow keys to look around<br>
-        Speed: <span id="speed">0</span> km/h
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="controls">
+        <div class="joystick" id="moveJoystick">
+            <div class="joystick-inner" id="moveJoystickInner"></div>
+        </div>
+        
+        <div id="actionButtons">
+            <div class="action-btn" id="jumpBtn">↑</div>
+            <div class="action-btn" id="actionBtn">✋</div>
+        </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    
+    <div id="inventory">
+        <div class="inventory-slot" data-block="grass">
+            <div class="block-icon" style="background-color: #3a5f0b;"></div>
+        </div>
+        <div class="inventory-slot" data-block="dirt">
+            <div class="block-icon" style="background-color: #8B4513;"></div>
+        </div>
+        <div class="inventory-slot" data-block="stone">
+            <div class="block-icon" style="background-color: #808080;"></div>
+        </div>
+        <div class="inventory-slot" data-block="wood">
+            <div class="block-icon" style="background-color: #8B4513;"></div>
+        </div>
+        <div class="inventory-slot" data-block="leaf">
+            <div class="block-icon" style="background-color: #00aa00;"></div>
+        </div>
+    </div>
+    
     <script>
-        // Basic setup
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
-
-        // Lighting
-        const light = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(light);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(100, 100, 50);
-        scene.add(directionalLight);
-
-        // Ground
-        const groundGeometry = new THREE.PlaneGeometry(1000, 1000);
-        const groundMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x3a5f0b,
-            side: THREE.DoubleSide
-        });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.rotation.x = Math.PI / 2;
-        scene.add(ground);
-
-        // Simple road
-        const roadGeometry = new THREE.PlaneGeometry(20, 1000);
-        const roadMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
-        const road = new THREE.Mesh(roadGeometry, roadMaterial);
-        road.rotation.x = Math.PI / 2;
-        road.position.z = -500;
-        scene.add(road);
-
-        // Simple car (just a box)
-        const carGeometry = new THREE.BoxGeometry(4, 2, 8);
-        const carMaterial = new THREE.MeshPhongMaterial({ color: 0x156289 });
-        const car = new THREE.Mesh(carGeometry, carMaterial);
-        car.position.y = 1;
-        scene.add(car);
-
-        // Camera follows car
-        camera.position.set(0, 5, 10);
-        camera.lookAt(car.position);
-
-        // Controls
-        const keys = {};
-        document.addEventListener('keydown', (e) => keys[e.key] = true);
-        document.addEventListener('keyup', (e) => keys[e.key] = false);
-
+        // Game constants
+        const BLOCK_SIZE = 1;
+        const CHUNK_SIZE = 16;
+        const RENDER_DISTANCE = 4;
+        const GRAVITY = 0.002;
+        const JUMP_FORCE = 0.15;
+        const MOVEMENT_SPEED = 0.03;
+        
         // Game state
-        let speed = 0;
-        let rotation = 0;
-        const maxSpeed = 0.5;
-        const acceleration = 0.01;
-        const deceleration = 0.02;
-        const rotationSpeed = 0.03;
-
-        // Game loop
-        function animate() {
-            requestAnimationFrame(animate);
-
-            // Car controls
-            if (keys['w'] || keys['ArrowUp']) speed = Math.min(speed + acceleration, maxSpeed);
-            else if (keys['s'] || keys['ArrowDown']) speed = Math.max(speed - acceleration, -maxSpeed/2);
-            else {
-                if (speed > 0) speed = Math.max(0, speed - deceleration);
-                else if (speed < 0) speed = Math.min(0, speed + deceleration);
-            }
-
-            if (keys['a'] || keys['ArrowLeft']) rotation += rotationSpeed;
-            if (keys['d'] || keys['ArrowRight']) rotation -= rotationSpeed;
-
-            // Move car
-            car.rotation.y = rotation;
-            car.position.x -= Math.sin(rotation) * speed;
-            car.position.z -= Math.cos(rotation) * speed;
-
-            // Camera follow
-            camera.position.x = car.position.x - Math.sin(rotation) * 10;
-            camera.position.z = car.position.z - Math.cos(rotation) * 10;
-            camera.position.y = car.position.y + 5;
-            camera.lookAt(car.position);
-
-            // Update speed display
-            document.getElementById('speed').textContent = Math.abs(Math.round(speed * 100));
-
-            renderer.render(scene, camera);
+        const gameState = {
+            player: {
+                x: 0,
+                y: 20,
+                z: 0,
+                velocityY: 0,
+                rotationX: 0,
+                rotationY: 0,
+                selectedBlock: 'grass'
+            },
+            world: {},
+            chunks: {},
+            isJumping: false,
+            moveX: 0,
+            moveZ: 0,
+            touchStart: null,
+            moveJoystickActive: false,
+            moveJoystickPos: { x: 0, y: 0 },
+            lastTouch: { x: 0, y: 0 }
+        };
+        
+        // Canvas setup
+        const canvas = document.getElementById('gameCanvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
         }
-
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        // Start animation
-        animate();
-    </script>
-</body>
-</html>
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        // Shaders
+        const vertexShaderSource = `
+            attribute vec3 aPosition;
+            attribute vec2 aTexCoord;
+            attribute vec3 aColor;
+            
+            uniform mat4 uModelViewMatrix;
+            uniform mat4 uProjectionMatrix;
+            
+            varying vec2 vTexCoord;
+            varying vec3 vColor;
+            
+            void main() {
+                gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aPosition, 1.0);
+                vTexCoord = aTexCoord;
+                vColor = aColor;
+            }
+        `;
+        
+        const fragmentShaderSource = `
+            precision mediump float;
+            
+            varying vec2 vTexCoord;
+            varying vec3 vColor;
+            
+            void main() {
+                gl_FragColor = vec4(vColor, 1.0);
+            }
+        `;
+        
+        function compileShader(gl, source, type) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('Shader compilation error:', gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            
+            return shader;
+        }
+        
+        const vertexShader = compileShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
+        const fragmentShader = compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
+        
+        const shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+        
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            console.error('Shader program linking error:', gl.getProgramInfoLog(shaderProgram));
+        }
+        
+        gl.useProgram(shaderProgram);
+        
+        // Get attribute and uniform locations
+        const programInfo = {
+            program: shaderProgram,
+            attribLocations: {
+                position: gl.getAttribLocation(shaderProgram, 'aPosition'),
+                texCoord: gl.getAttribLocation(shaderProgram, 'aTexCoord'),
+                color: gl.getAttribLocation(shaderProgram, 'aColor')
+            },
+            uniformLocations: {
+                projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+                modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix')
+            }
+        };
+        
+        // Block data
+        const blockTypes = {
+            grass: { color: [0.23, 0.37, 0.04] },
+            dirt: { color: [0.55, 0.27, 0.07] },
+            stone: { color: [0.5, 0.5, 0.5] },
+            wood: { color: [0.55, 0.27, 0.07] },
+            leaf: { color: [0.0, 0.67, 0.0] }
+        };
+        
+        // Generate block vertices
+        function createBlockVertices(x, y, z, blockType) {
+            const color = blockTypes[blockType].color;
+            const vertices = [];
+            const colors = [];
+            
+            // Front face
+            vertices.push(
+                x, y, z + BLOCK_SIZE,
+                x + BLOCK_SIZE, y, z + BLOCK_SIZE,
+                x + BLOCK_SIZE, y + BLOCK_SIZE, z + BLOCK_SIZE,
+                x, y + BLOCK_SIZE, z + BLOCK_SIZE
+            );
+            
+            // Back face
+            vertices.push(
+                x + BLOCK_SIZE, y, z,
+                x, y, z,
+                x, y + BLOCK_SIZE, z,
+                x + BLOCK_SIZE, y + BLOCK_SIZE, z
+            );
+            
+            // Top face
+            vertices.push(
+                x, y + BLOCK_SIZE, z + BLOCK_SIZE,
+                x + BLOCK_SIZE, y + BLOCK_SIZE, z + BLOCK_SIZE,
+                x + BLOCK_SIZE, y + BLOCK_SIZE, z,
+                x, y + BLOCK_SIZE, z
+            );
+            
+            // Bottom face
+            vertices.push(
+                x, y, z,
+                x + BLOCK_SIZE, y, z,
+                x + BLOCK_SIZE, y, z + BLOCK_SIZE,
+                x, y, z + BLOCK_SIZE
+            );
+            
+            // Right face
+            vertices.push(
+                x + BLOCK_SIZE, y, z + BLOCK_SIZE,
+                x + BLOCK_SIZE, y, z,
+                x + BLOCK_SIZE, y + BLOCK_SIZE, z,
+                x + BLOCK_SIZE, y + BLOCK_SIZE, z + BLOCK_SIZE
+            );
+            
+            // Left face
+            vertices.push(
+                x, y, z,
+                x, y, z + BLOCK_SIZE,
+                x, y + BLOCK_SIZE, z + BLOCK_SIZE,
+                x, y + BLOCK_SIZE, z
+            );
+            
+            // Add colors for each vertex (6 faces * 4 vertices)
+            for (let i = 0; i < 6; i++) {
+                colors.push(...color, ...color, ...color, ...color);
+            }
+            
+            return { vertices, colors };
+        }
+        
+        // Generate chunk
+        function generateChunk(cx, cz) {
+            const chunkKey = `${cx},${cz}`;
+            const blocks = {};
+            
+            // Simple terrain generation
+            for (let x = 0; x < CHUNK_SIZE; x++) {
+                for (let z = 0; z < CHUNK_SIZE; z++) {
+                    const wx = cx * CHUNK_SIZE + x;
+                    const wz = cz * CHUNK_SIZE + z;
+                    
+                    // Heightmap
+                    const height = Math.floor(10 + Math.sin(wx * 0.1) * 3 + Math.cos(wz * 0.1) * 3;
+                    
+                    for (let y = 0; y < height; y++) {
+                        let blockType = 'dirt';
+                        if (y === height - 1) blockType = 'grass';
+                        if (y < height - 3) blockType = 'stone';
+                        
+                        blocks[`${wx},${y},${wz}`] = blockType;
+                    }
+                    
+                    // Simple trees
+                    if (Math.random() < 0.01 && height > 12) {
+                        const treeHeight = 4 + Math.floor(Math.random() * 3);
+                        const treeX = wx;
+                        const treeZ = wz;
+                        
+                        // Trunk
+                        for (let ty = height; ty < height + treeHeight; ty++) {
+                            blocks[`${treeX},${ty},${treeZ}`] = 'wood';
+                        }
+                        
+                        // Leaves
+                        for (let lx = -2; lx <= 2; lx++) {
+                            for (let lz = -2; lz <= 2; lz++) {
+                                for (let ly = -1; ly <= 1; ly++) {
+                                    if (Math.abs(lx) === 2 && Math.abs(lz) === 2 && Math.abs(ly) === 1) continue;
+                                    const lyPos = height + treeHeight - 1 + ly;
+                                    if (lyPos > height + treeHeight) continue;
+                                    
+                                    blocks[`${treeX + lx},${lyPos},${treeZ + lz}`] = 'leaf';
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            gameState.chunks[chunkKey] = blocks;
+            return blocks;
+        }
+        
+        // Get block at position
+        function getBlock(x, y, z) {
+            const cx = Math.floor(x / CHUNK_SIZE);
+            const cz = Math.floor(z / CHUNK_SIZE);
+            const chunkKey = `${cx},${cz}`;
+            
+            if (!gameState.chunks[chunkKey]) {
+                return null;
+            }
+            
+            const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+            return gameState.chunks[chunkKey][blockKey] || null;
+        }
+        
+        // Set block at position
+        function setBlock(x, y, z, blockType) {
+            const cx = Math.floor(x / CHUNK_SIZE);
+            const cz = Math.floor(z / CHUNK_SIZE);
+            const chunkKey = `${cx},${cz}`;
+            
+            if (!gameState.chunks[chunkKey]) {
+                gameState.chunks[chunkKey] = {};
+            }
+            
+            const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+            if (blockType) {
+                gameState.chunks[chunkKey][blockKey] = blockType;
+            } else {
+                delete gameState.chunks[chunkKey][blockKey];
+            }
+            
+            return true;
+        }
+        
+        // Check if position is solid
+        function isSolid(x, y, z) {
+            const block = getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
+            return block !== null;
+        }
+        
+        // Initialize buffers
+        let vertexBuffer = gl.createBuffer();
+        let colorBuffer = gl.createBuffer();
+        
+        // Render scene
+        function render() {
+            gl.clearColor(0.53, 0.81, 0.92, 1.0); // Sky color
+            gl.clearDepth(1.0);
+            gl.enable(gl.DEPTH_TEST);
+            gl.depthFunc(gl.LEQUAL);
+            
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
+            // Set up perspective matrix
+            const fieldOfView = 60 * Math.PI / 180;
+            const aspect = canvas.clientWidth / canvas.clientHeight;
+            const zNear = 0.1;
+            const zFar = 1000.0;
+            
+            const projectionMatrix = mat4.create();
+            mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
+            
+            // Set up view matrix
+            const modelViewMatrix = mat4.create();
+            
+            // Apply player rotation
+            mat4.rotateX(modelViewMatrix, modelViewMatrix, -gameState.player.rotationX);
+            mat4.rotateY(modelViewMatrix, modelViewMatrix, -gameState.player.rotationY);
+            
+            // Apply player position
+            mat4.translate(modelViewMatrix, modelViewMatrix, [
+                -gameState.player.x,
+                -gameState.player.y - 1.6, // Eye level
+                -gameState.player.z
+            ]);
+            
+            // Set shader uniforms
+            gl.uniformMatrix4fv(
+                programInfo.uniformLocations.projectionMatrix,
+                false,
+                projectionMatrix
+            );
+            
+            gl.uniformMatrix4fv(
+                programInfo.uniformLocations.modelViewMatrix,
+                false,
+                modelViewMatrix
+            );
+            
+            // Collect all visible blocks to render
+            const px = Math.floor(gameState.player.x);
+            const py = Math.floor(gameState.player.y);
+            const pz = Math.floor(gameState.player.z);
+            
+            let allVertices = [];
+            let allColors = [];
+            
+            // Render chunks within render distance
+            for (let cx = -RENDER_DISTANCE; cx <= RENDER_DISTANCE; cx++) {
+                for (let cz = -RENDER_DISTANCE; cz <= RENDER_DISTANCE; cz++) {
+                    const chunkX = Math.floor(px / CHUNK_SIZE) + cx;
+                    const chunkZ = Math.floor(pz / CHUNK_SIZE) + cz;
+                    const chunkKey = `${chunkX},${chunkZ}`;
+                    
+                    if (!gameState.chunks[chunkKey]) {
+                        generateChunk(chunkX, chunkZ);
+                    }
+                    
+                    const chunk = gameState.chunks[chunkKey];
+                    
+                    for (const blockKey in chunk) {
+                        const [bx, by, bz] = blockKey.split(',').map(Number);
+                        
+                        // Only render blocks within vertical render distance
+                        if (Math.abs(by - py) > RENDER_DISTANCE * 2) continue;
+                        
+                        const blockType = chunk[blockKey];
+                        const blockData = createBlockVertices(bx, by, bz, blockType);
+                        
+                        allVertices.push(...blockData.vertices);
+                        allColors.push(...blockData.colors);
+                    }
+                }
+            }
+            
+            // Bind and fill vertex buffer
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(allVertices), gl.STATIC_DRAW);
+            gl.vertexAttribPointer(programInfo.attribLocations.position, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(programInfo.attribLocations.position);
+            
+            // Bind and fill color buffer
+            gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(allColors), gl.STATIC_DRAW);
+            gl.vertexAttribPointer(programInfo.attribLocations.color, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(programInfo.attribLocations.color);
+            
+            // Draw all blocks
+            for (let i = 0; i < allVertices.length / 12; i++) {
+                gl.drawArrays(gl.TRIANGLE_FAN, i * 4, 4);
+            }
+        }
+        
+        // Game loop
+        function gameLoop(timestamp) {
+            updatePlayer();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Player movement and physics
+        function updatePlayer() {
+            const player = gameState.player;
+            
+            // Apply gravity
+            player.velocityY -= GRAVITY;
+            
+            // Check if player is on ground
+            const feetY = player.y - 1.8; // Player height is 1.8 blocks
+            const onGround = isSolid(player.x, feetY - 0.1, player.z);
+            
+            if (onGround) {
+                player.velocityY = 0;
+                gameState.isJumping = false;
+            }
+            
+            // Handle jumping
+            if (gameState.jumpRequested && onGround && !gameState.isJumping) {
+                player.velocityY = JUMP_FORCE;
+                gameState.isJumping = true;
+                gameState.jumpRequested = false;
+            }
+            
+            // Apply vertical movement
+            player.y += player.velocityY;
+            
+            // Check vertical collisions
+            if (player.velocityY < 0 && isSolid(player.x, feetY, player.z)) {
+                player.y = Math.ceil(feetY) + 1.8;
+                player.velocityY = 0;
+            } else if (player.velocityY > 0 && isSolid(player.x, player.y, player.z)) {
+                player.y = Math.floor(player.y);
+                player.velocityY = 0;
+            }
+            
+            // Calculate movement direction based on rotation
+            const moveX = gameState.moveX;
+            const moveZ = gameState.moveZ;
+            
+        
